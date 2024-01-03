@@ -4,11 +4,18 @@ import random
 import configparser
 import os
 
+# Инициализация Pygame и звукового модуля
 pygame.init()
 pygame.mixer.init()
 jump_sound = pygame.mixer.Sound('data/jump_sound.mp3')
 crash_sound = pygame.mixer.Sound('data/collision_sound.wav')
 score_sound = pygame.mixer.Sound('data/score_sound.mp3')
+fon_sound_files = ['data/8848.mp3', 'data/a-folk-story.mp3', 'data/japan.mp3', 'data/piano.mp3']
+
+# Загрузка звуков
+fon_sounds = [pygame.mixer.Sound(file) for file in fon_sound_files]
+current_fon_index = 0
+fon_sounds[current_fon_index].play(-1)
 
 # Определение констант
 WIDTH, HEIGHT = 1000, 600
@@ -19,6 +26,7 @@ JUMP_POWER = -12
 PIPE_SPEED = 8
 PIPE_PAIR_SEC_DISTANCE = 800
 BIRD_SIZE = 1.0
+MUSIC_VOLUME = 0.5
 
 # Определение цветов
 WHITE = (255, 255, 255)
@@ -52,7 +60,8 @@ if not os.path.exists(config_file):
         'JUMP_POWER': str(JUMP_POWER),
         'PIPE_SPEED': str(PIPE_SPEED),
         'PIPE_PAIR_SEC_DISTANCE': str(PIPE_PAIR_SEC_DISTANCE),
-        'BIRD_SIZE': str(BIRD_SIZE)
+        'BIRD_SIZE': str(BIRD_SIZE),
+        'MUSIC_VOLUME': str(MUSIC_VOLUME)
     }
     with open(config_file, 'w') as configfile:
         config.write(configfile)
@@ -63,18 +72,18 @@ config.add_section('GameSettings')
 config.read(config_file)
 
 # Получение значений параметров из конфигурации
-GROUND_HEIGHT = int(config['GameSettings'].get('GROUND_HEIGHT', GROUND_HEIGHT))
-GRAVITY = int(config['GameSettings'].get('GRAVITY', GRAVITY))
-JUMP_POWER = int(config['GameSettings'].get('JUMP_POWER', JUMP_POWER))
-PIPE_SPEED = int(config['GameSettings'].get('PIPE_SPEED', PIPE_SPEED))
-PIPE_PAIR_SEC_DISTANCE = int(config['GameSettings'].get('PIPE_PAIR_SEC_DISTANCE', PIPE_PAIR_SEC_DISTANCE))
-BIRD_SIZE = float(config['GameSettings'].get('BIRD_SIZE', BIRD_SIZE))
-
+GROUND_HEIGHT = int(config['GameSettings'].get('GROUND_HEIGHT', str(GROUND_HEIGHT)))
+GRAVITY = int(config['GameSettings'].get('GRAVITY', str(GRAVITY)))
+JUMP_POWER = int(config['GameSettings'].get('JUMP_POWER', str(JUMP_POWER)))
+PIPE_SPEED = int(config['GameSettings'].get('PIPE_SPEED', str(PIPE_SPEED)))
+PIPE_PAIR_SEC_DISTANCE = int(config['GameSettings'].get('PIPE_PAIR_SEC_DISTANCE', str(PIPE_PAIR_SEC_DISTANCE)))
+BIRD_SIZE = float(config['GameSettings'].get('BIRD_SIZE', str(BIRD_SIZE)))
+MUSIC_VOLUME = float(config['GameSettings'].get('MUSIC_VOLUME', str(MUSIC_VOLUME)))
 
 
 # Функция для отображения и обработки экрана настроек
 def show_settings_screen():
-    global GROUND_HEIGHT, GRAVITY, JUMP_POWER, PIPE_SPEED, PIPE_PAIR_SEC_DISTANCE, BIRD_SIZE
+    global GROUND_HEIGHT, GRAVITY, JUMP_POWER, PIPE_SPEED, PIPE_PAIR_SEC_DISTANCE, BIRD_SIZE, MUSIC_VOLUME
 
     config = configparser.ConfigParser()
 
@@ -106,6 +115,11 @@ def show_settings_screen():
                         PIPE_PAIR_SEC_DISTANCE += 10
                     elif selected_param == 5:
                         BIRD_SIZE += 0.1  # Изменено на увеличение размера птицы на 0.1
+                    elif selected_param == 6:
+                        # Увеличить громкость музыки
+                        MUSIC_VOLUME = min(MUSIC_VOLUME + 0.1, 1.0)
+                        for sound in fon_sounds:
+                            sound.set_volume(MUSIC_VOLUME)
                 elif event.key == pygame.K_LEFT:
                     # Уменьшить значение выбранного параметра
                     if selected_param == 0:
@@ -120,6 +134,11 @@ def show_settings_screen():
                         PIPE_PAIR_SEC_DISTANCE -= 10
                     elif selected_param == 5:
                         BIRD_SIZE -= 0.1  # Изменено на уменьшение размера птицы на 0.1
+                    elif selected_param == 6:
+                        # Уменьшить громкость музыки
+                        MUSIC_VOLUME = max(MUSIC_VOLUME - 0.1, 0.0)
+                        for sound in fon_sounds:
+                            sound.set_volume(MUSIC_VOLUME)
 
                     # Защита от отрицательных значений
                     if GROUND_HEIGHT < 0:
@@ -137,10 +156,10 @@ def show_settings_screen():
 
                 elif event.key == pygame.K_DOWN:
                     # Переключиться на следующий параметр
-                    selected_param = (selected_param + 1) % 6
+                    selected_param = (selected_param + 1) % 7
                 elif event.key == pygame.K_UP:
                     # Переключиться на предыдущий параметр
-                    selected_param = (selected_param - 1) % 6
+                    selected_param = (selected_param - 1) % 7
 
                 # Ограничение диапазона значений
                 GROUND_HEIGHT = max(0, GROUND_HEIGHT)
@@ -149,6 +168,7 @@ def show_settings_screen():
                 PIPE_SPEED = max(1, PIPE_SPEED)
                 PIPE_PAIR_SEC_DISTANCE = max(10, PIPE_PAIR_SEC_DISTANCE)
                 BIRD_SIZE = max(0.1, BIRD_SIZE)
+                MUSIC_VOLUME = max(0.0, min(1.0, MUSIC_VOLUME))  # Ограничение диапазона громкости музыки
 
                 # Сохранение параметров в конфигурационный файл
                 config['GameSettings'] = {
@@ -157,11 +177,12 @@ def show_settings_screen():
                     'JUMP_POWER': str(JUMP_POWER),
                     'PIPE_SPEED': str(PIPE_SPEED),
                     'PIPE_PAIR_SEC_DISTANCE': str(PIPE_PAIR_SEC_DISTANCE),
-                    'BIRD_SIZE': str(BIRD_SIZE)
+                    'BIRD_SIZE': str(BIRD_SIZE),
+                    'MUSIC_VOLUME': str(MUSIC_VOLUME)
                 }
 
                 # Обновление текста параметров
-                selected_param = min(5, max(0, selected_param))  # Ограничение диапазона выбора параметров
+                selected_param = min(6, max(0, selected_param))  # Ограничение диапазона выбора параметров
 
         screen.fill((255, 255, 255))
         screen.blit(background_image, (0, 0))
@@ -175,7 +196,8 @@ def show_settings_screen():
             f"JUMP_POWER: {JUMP_POWER}",
             f"PIPE_SPEED: {PIPE_SPEED}",
             f"PIPE_PAIR_SEC_DISTANCE: {PIPE_PAIR_SEC_DISTANCE}",
-            f"BIRD_SIZE: {BIRD_SIZE}",
+            f"BIRD_SIZE: {BIRD_SIZE:.1f}",
+            f"MUSIC_VOLUME: {MUSIC_VOLUME:.1f}",
             "Используйте стрелки ВВЕРХ/ВНИЗ/ВПРАВО/ВЛЕВО для изменения, Escape - вернуться к игре"
         ]
 
@@ -214,7 +236,7 @@ class Bird(pygame.sprite.Sprite):
         scaled_width = int(self.images[0].get_width() * BIRD_SIZE)
         scaled_height = int(self.images[0].get_height() * BIRD_SIZE)
         self.image = pygame.transform.scale(self.images[self.index // self.animation_speed].convert_alpha(),
-                                           (scaled_width, scaled_height))
+                                            (scaled_width, scaled_height))
 
         if self.rect.bottom > HEIGHT - GROUND_HEIGHT:
             self.rect.bottom = HEIGHT - GROUND_HEIGHT
@@ -336,6 +358,9 @@ while True:
             scored_pipe = None
             pygame.time.set_timer(spawn_pipe_event, PIPE_PAIR_SEC_DISTANCE)
 
+    if not pygame.mixer.get_busy():
+        fon_sounds[current_fon_index].play()
+
     all_sprites.update()
 
     # Обработка столкновений
@@ -407,4 +432,3 @@ while True:
                     crash = False
 
                 clock.tick(FPS)
-
